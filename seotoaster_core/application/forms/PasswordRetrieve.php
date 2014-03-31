@@ -11,6 +11,7 @@ class Application_Form_PasswordRetrieve extends Zend_Form {
 
 		$this->setAttribs(array(
 			'id'     => 'password-retrive',
+//			'class'  => 'grid_12 mt20px mb20px',
 			'method' => Zend_Form::METHOD_POST
 		));
 
@@ -38,7 +39,7 @@ class Application_Form_PasswordRetrieve extends Zend_Form {
 			'main' => array('email')
 		));
 
-		$main = $this->getDisplayGroup('main')
+		$this->getDisplayGroup('main')
 			->setDecorators(array(
 				'FormElements',
 		        'Fieldset',

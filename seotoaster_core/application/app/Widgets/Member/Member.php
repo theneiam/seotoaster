@@ -10,6 +10,8 @@ class Widgets_Member_Member extends Widgets_Abstract {
 
     protected $_cacheable      = false;
 
+    protected $_translator      = false;
+
 	protected function  _init() {
 		parent::_init();
 		$this->_view = new Zend_View(array(
@@ -33,8 +35,14 @@ class Widgets_Member_Member extends Widgets_Abstract {
 	protected function _renderMemberLogin() {
 		$this->_view->userRole  = $this->_session->getCurrentUser()->getRoleId();
 		$this->_view->loginForm = $this->_reInitDecorators(new Application_Form_Login());
-		$this->_view->messages  = $this->_flashMessanger->getMessages();
-		unset($this->_session->errMemeberLogin);
+        $this->_view->messages  = array_merge($this->_flashMessanger->getMessages('passreset'), $this->_flashMessanger->getMessages());
+        $this->_flashMessanger->clearMessages('passreset');
+        $passwordRetrieveFrom = new Application_Form_PasswordRetrieve();
+        $passwordRetrieveFrom->setAction($this->_website->getUrl().'login/retrieve');
+        $this->_view->retrieveForm = $passwordRetrieveFrom;
+        $this->_session->retrieveRedirect = $this->_toasterOptions['url'];
+
+        unset($this->_session->errMemeberLogin);
 		if(isset($this->_options[0])) {
 			$this->_session->redirectUserTo = $this->_options[0];
 		}
@@ -45,13 +53,14 @@ class Widgets_Member_Member extends Widgets_Abstract {
         if($this->_session->getCurrentUser()->getRoleId() == Tools_Security_Acl::ROLE_GUEST){
             return '';
         }
-        return '<a href="' . $this->_website->getUrl() . 'logout" class="logout">Logout</a>';
+        $translator = Zend_Registry::get('Zend_Translate');
+        return '<a href="' . $this->_website->getUrl() . 'logout" class="logout">' . $translator->translate('Logout') . '</a>';
 	}
 
     protected function _renderMemberSignup() {
 		$this->_view->signupForm       = new Application_Form_Signup();
-		$flashMessanger                = Zend_Controller_Action_HelperBroker::getStaticHelper('FlashMessenger');
-		$errorMessages                 = $flashMessanger->getMessages();
+		$flashMessenger                = Zend_Controller_Action_HelperBroker::getStaticHelper('FlashMessenger');
+		$errorMessages                 = $flashMessenger->getMessages();
 		$this->_session->signupPageUrl = $this->_toasterOptions['url'];
 		$this->_view->errors           = ($errorMessages) ? $errorMessages : null;
 		return $this->_view->render('signup.phtml');

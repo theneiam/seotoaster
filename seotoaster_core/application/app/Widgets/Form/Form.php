@@ -4,6 +4,8 @@ class Widgets_Form_Form extends Widgets_Abstract {
 
     const WFORM_CACHE_TAG = 'formWidget';
 
+    const UPLOAD_LIMIT_SIZE = 10;
+
 	private $_websiteHelper   = null;
 
 	protected function _init() {
@@ -35,6 +37,7 @@ class Widgets_Form_Form extends Widgets_Abstract {
 
 		$useCaptcha   = (isset($this->_options[1]) && $this->_options[1] == 'captcha') ? true : false;
         $useRecaptcha = (isset($this->_options[1]) && $this->_options[1] == 'recaptcha') ? true : false;
+        $uploadLimitSize = (is_numeric(end($this->_options)) ? end($this->_options) : self::UPLOAD_LIMIT_SIZE);
         $formMapper   = Application_Model_Mappers_FormMapper::getInstance();
         $pageMapper   = Application_Model_Mappers_PageMapper::getInstance(); 
         $form         = $formMapper->findByName($this->_options[0]);
@@ -48,13 +51,17 @@ class Widgets_Form_Form extends Widgets_Abstract {
             }
             if($useRecaptcha){
                 $recaptchaTheme = 'red';
+                $recaptchaWidgetId = uniqid('recaptcha_widget_');
                 if(isset($this->_options[2])){
                     $recaptchaTheme = $this->_options[2];
-                    if($this->_options[2] == 'custom'){
+                    if($recaptchaTheme == 'custom'){
                         $this->_view->customRecaptcha = true;
                     }
                 }
-                $this->_view->recapthaCode = Tools_System_Tools::generateRecaptcha($recaptchaTheme);
+                $this->_view->recaptchaWidgetId = $recaptchaWidgetId;
+                $this->_view->addScriptPath($this->_websiteHelper->getPath()
+                    . 'seotoaster_core/application/views/scripts/backend/form/');
+                $this->_view->recaptchaCode = Tools_System_Tools::generateRecaptcha($recaptchaTheme, $recaptchaWidgetId);
             }
             if($useCaptcha){
                 $this->_view->captchaId = Tools_System_Tools::generateCaptcha();
@@ -79,6 +86,7 @@ class Widgets_Form_Form extends Widgets_Abstract {
 		$this->_view->form              = Application_Model_Mappers_FormMapper::getInstance()->findByName($this->_options[0]);
 		$this->_view->allowMidification = Tools_Security_Acl::isAllowed(Tools_Security_Acl::RESOURCE_ADMINPANEL);
 		$this->_view->formName          = $this->_options[0];
+        $this->_view->uploadLimitSize   = $uploadLimitSize;
 
         $filter                         = new Zend_Filter_Alnum();
         $this->_view->formId            = $filter->filter($this->_options[0]);

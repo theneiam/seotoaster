@@ -6,6 +6,8 @@
  */
 class Backend_ContentController extends Zend_Controller_Action {
 
+    public static $_allowedActions = array('ajaxcontent');
+
 	const IMG_CONTENTTYPE_SMALL    = 'small';
 
 	const IMG_CONTENTTYPE_MEDIUM   = 'medium';
@@ -23,7 +25,7 @@ class Backend_ContentController extends Zend_Controller_Action {
 	public function init() {
 		parent::init();
 		$this->_websiteData = Zend_Registry::get('website');
-		if(!Tools_Security_Acl::isAllowed(Tools_Security_Acl::RESOURCE_CONTENT)) {
+		if(!Tools_Security_Acl::isAllowed(Tools_Security_Acl::RESOURCE_CONTENT) && !Tools_Security_Acl::isActionAllowed()) {
 			$this->redirect($this->_helper->website->getUrl(), array('exit' => true));
 		}
 
@@ -86,6 +88,13 @@ class Backend_ContentController extends Zend_Controller_Action {
 		echo $this->_renderCorrectView();
 	}
 
+    public function ajaxcontentAction() {
+        $currentPage =  Application_Model_Mappers_PageMapper::getInstance()->find($this->getRequest()->getParam('pageId'));
+        $currentPage = ($currentPage == null) ? array() : $currentPage->toArray();
+        $parseContent = new Tools_Content_Parser('{$' . $this->getRequest()->getParam('widget') . '}', $currentPage, array('websiteUrl'   => $this->_helper->website->getUrl()));
+        $this->_helper->response->success($parseContent->parseSimple());
+    }
+
 	private function _loadPluginsTabs() {
 		if(!($pluginsTabsData = $this->_helper->cache->load(Helpers_Action_Cache::KEY_PLUGINTABS, Helpers_Action_Cache::PREFIX_PLUGINTABS))) {
 			$pluginsTabsData  = Tools_Plugins_Tools::getPluginTabContent();
@@ -124,7 +133,8 @@ class Backend_ContentController extends Zend_Controller_Action {
 				$container->setPublishingDate('');
 			}
 
-			$this->_helper->cache->clean($container->getName() . $pageId, 'widget_');
+            $cacheTag = preg_replace('/[^\w\d_]/', '', $container->getName() . '_' . $container->getContainerType() . '_pid_' . $container->getPageId());
+			$this->_helper->cache->clean(null, null, array($cacheTag));
 			$saveResult = Application_Model_Mappers_ContainerMapper::getInstance()->save($container);
 
 			if(!$container->getId()) {
@@ -153,6 +163,7 @@ class Backend_ContentController extends Zend_Controller_Action {
 					'medium' => $this->_helper->config->getConfig('imgMedium'),
 					'large'  => $this->_helper->config->getConfig('imgLarge')
 				);
+                $this->view->linkContentCss     = Tools_Theme_Tools::urlContentCss();
 				$this->view->pluginsEditorLinks = $this->_loadPluginsEditorLinks();
 				$this->view->pluginsEditorTop   = $this->_loadPluginsEditorTop();
 				$rendered                       = $this->view->render('backend/content/content.phtml');
@@ -244,10 +255,10 @@ class Backend_ContentController extends Zend_Controller_Action {
 			$imagesPath  = $this->_websiteData['path'] . $this->_websiteData['media'] . $folderName;
 			try {
                 $imagesData  = array(
-                    'small'    => $this->_proccessImages(Tools_Filesystem_Tools::scanDirectory($imagesPath . '/' . self::IMG_CONTENTTYPE_SMALL), $imagesPath, $folderName, self::IMG_CONTENTTYPE_SMALL),
-                    'medium'   => $this->_proccessImages(Tools_Filesystem_Tools::scanDirectory($imagesPath . '/' . self::IMG_CONTENTTYPE_MEDIUM), $imagesPath, $folderName, self::IMG_CONTENTTYPE_MEDIUM),
-                    'large'    => $this->_proccessImages(Tools_Filesystem_Tools::scanDirectory($imagesPath . '/' . self::IMG_CONTENTTYPE_LARGE), $imagesPath, $folderName, self::IMG_CONTENTTYPE_LARGE),
-                    'original' => $this->_proccessImages(Tools_Filesystem_Tools::scanDirectory($imagesPath . '/' . self::IMG_CONTENTTYPE_ORIGINAL), $imagesPath, $folderName, self::IMG_CONTENTTYPE_ORIGINAL)
+                    'small'    => '<div class="images-preview list-images">' . $this->_proccessImages(Tools_Filesystem_Tools::scanDirectory($imagesPath . '/' . self::IMG_CONTENTTYPE_SMALL), $imagesPath, $folderName, self::IMG_CONTENTTYPE_SMALL) . '</div>',
+                    'medium'   => '<div class="images-preview list-images">' . $this->_proccessImages(Tools_Filesystem_Tools::scanDirectory($imagesPath . '/' . self::IMG_CONTENTTYPE_MEDIUM), $imagesPath, $folderName, self::IMG_CONTENTTYPE_MEDIUM) . '</div>',
+                    'large'    => '<div class="images-preview list-images">' . $this->_proccessImages(Tools_Filesystem_Tools::scanDirectory($imagesPath . '/' . self::IMG_CONTENTTYPE_LARGE), $imagesPath, $folderName, self::IMG_CONTENTTYPE_LARGE) . '</div>',
+                    'original' => '<div class="images-preview list-images">' . $this->_proccessImages(Tools_Filesystem_Tools::scanDirectory($imagesPath . '/' . self::IMG_CONTENTTYPE_ORIGINAL), $imagesPath, $folderName, self::IMG_CONTENTTYPE_ORIGINAL) . '</div>'
                 );
             }
             catch(Exceptions_SeotoasterException $se) {
@@ -282,7 +293,7 @@ class Backend_ContentController extends Zend_Controller_Action {
 				$imageSize      = getimagesize($path . '/' . $type . '/' . $image);
 				$imageElement   = htmlspecialchars('<a class="_lbox" href="' . $srcPath . '/' .  self::IMG_CONTENTTYPE_ORIGINAL . '/' . $image . '" title="' . str_replace('-', '&nbsp;', $imageName) . '"><img border="0" alt="'. str_replace('-', '&nbsp;', $imageName) . '" src="' . $srcPath . '/' . $type . '/' . $image . '" width="' . $imageSize[0] . '" height="' . $imageSize[1] . '" /></a>');
 				$imagesContent .= '<a href="javascript:;" onmousedown="$(\'#content\').tinymce().execCommand(\'mceInsertContent\', false, \'' . $imageElement . '\');">';
-				$imagesContent .= '<img title="' . $image . '" style="vertical-align:top; margin: 0px 0px 4px 4px;" border="0" width="80" src="' . $srcPath . '/product/' . $image .'" /></a>';
+				$imagesContent .= '<img title="' . $image . '" border="0" width="80" src="' . $srcPath . '/product/' . $image .'" /></a>';
 			}
 			return $imagesContent;
 		}

@@ -17,9 +17,13 @@ class Tools_System_Tools {
 
 	const PLACEHOLDER_SYSTEM_VERSION    = 'sysverHolder';
 
+    const RECAPTCHA_PUBLIC_KEY = 'recaptchaPublicKey';
+
+    const RECAPTCHA_PRIVATE_KEY = 'recaptchaPrivateKey';
+
 	public static function getUrlPath($url) {
 		$parsedUrl = self::_proccessUrl($url);
-		return (isset($parsedUrl['path'])) ? trim($parsedUrl['path'], '/')  . (isset($parsedUrl['query']) ? '?' . $parsedUrl['query'] : '') : 'index.html';
+		return (isset($parsedUrl['path'])) ? trim($parsedUrl['path'], '/')  . (isset($parsedUrl['query']) ? '?' . $parsedUrl['query'] : '') : '';
 	}
 
 	public static function getUrlScheme($url) {
@@ -137,11 +141,22 @@ class Tools_System_Tools {
      * @return recaptcha code
      */
     
-    public static function generateRecaptcha($captchaTheme = 'red') {
+    public static function generateRecaptcha($captchaTheme = 'red', $captchaId = null) {
         $websiteConfig = Zend_Controller_Action_HelperBroker::getExistingHelper('config')->getConfig();
-        if(!empty($websiteConfig) && isset($websiteConfig['recapthaPublicKey']) && $websiteConfig['recapthaPublicKey'] != '' && isset($websiteConfig['recapthaPrivateKey']) && $websiteConfig['recapthaPrivateKey'] != ''){
+        if (!empty($websiteConfig) && !empty($websiteConfig[self::RECAPTCHA_PUBLIC_KEY]) && !empty($websiteConfig[self::RECAPTCHA_PRIVATE_KEY])) {
             $options = array('theme' => $captchaTheme);
-            $recaptcha = new Zend_Service_ReCaptcha($websiteConfig['recapthaPublicKey'], $websiteConfig['recapthaPrivateKey'], null, $options);
+            $params = null;
+            if(isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] == "on") {
+                $params = array(
+                    'ssl' => Zend_Controller_Front::getInstance()->getRequest()->isSecure(),
+                    'error' => null,
+                    'xhtml' => false
+                );
+            }
+            if (null !== $captchaId) {
+                $options['custom_theme_widget'] = $captchaId;
+            }
+            $recaptcha = new Zend_Service_ReCaptcha($websiteConfig[self::RECAPTCHA_PUBLIC_KEY], $websiteConfig[self::RECAPTCHA_PRIVATE_KEY], $params, $options);
             return $recaptcha->getHTML();
         }
         return false;
@@ -164,9 +179,17 @@ class Tools_System_Tools {
 		return false;
 	}
 
-	public static function getRequestUri() {
-		$front = Zend_Controller_Front::getInstance();
-		return $front->getRequest()->getParam('page', false);
+    /**
+     * Get requested uri
+     *
+     * @return string
+     */
+    public static function getRequestUri() {
+		$request = Zend_Controller_Front::getInstance()->getRequest();
+        if(($uri = $request->getParam('page', false)) === false) {
+            return $request->getRequestUri();
+        }
+        return $uri;
 	}
 
 	public static function getTemplatesHash($type = 'all') {

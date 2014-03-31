@@ -36,13 +36,25 @@ class Tools_Content_Tools {
 		return $matches;
 	}
 
+    public static function proccessFormMessages($messages){
+        foreach ($messages as $elName => $message) {
+            $messg = '';
+            foreach ($message as $msg) {
+                $messg .= $msg.' ';
+            }
+            $messageResult[$elName] = trim($messg);
+        }
+        return $messageResult;
+    }
+
+
 	public static function proccessFormMessagesIntoHtml($messages, $formClassName = '') {
 		$form = ($formClassName) ? new $formClassName() : null;
-		$html = '<ul class="form-errors">';
+		$html = '<ul class="form-errors list-unstyled">';
 		foreach ($messages as $element => $messageData) {
 			$errMessages = array_values($messageData);
 			$html .= '<li><span class="error-title">' . (($form) ? $form->getElement($element)->getLabel() : $element) . '</span>';
-			$html .= '<ul>';
+			$html .= '<ul class="list-unstyled text-italic">';
 			foreach ($errMessages as $message) {
 				$html .= '<li>' . $message . '</li>';
 			}
@@ -95,7 +107,12 @@ class Tools_Content_Tools {
 			}
 		}
 
-		$websiteHelper  = Zend_Controller_Action_HelperBroker::getStaticHelper('Website');
+        $websiteHelper = Zend_Controller_Action_HelperBroker::getStaticHelper('Website');
+        $pattern = '~<a.*href="'.$websiteHelper->getUrl().$deeplink->getUrl().'".*>'.$deeplink->getName().'</a>~';
+		if (preg_match($pattern, $content)) {
+            return $content;
+        }
+
 		$linksMatches   = self::findLinksInContent($content, false, self::PATTERN_LINKSIMPLE);
 		$headersMatches = self::findHeadersInContent($content);
 		$widgetsMatches = self::findWidgetsInContent($content);
@@ -111,7 +128,7 @@ class Tools_Content_Tools {
 		}
 
 		$pattern = '~([\>]{1}|\s+|[\/\>]{1}|^)(' . $deeplink->getName() . ')([\<]{1}|\s+|[.,!\?]+|$)~uUi';
-		if(preg_match($pattern, $content, $matches)) {
+		if (preg_match($pattern, $content, $matches)) {
 			Zend_Registry::set('applied', true);
 			$url = '<a ' . (($deeplink->getType() == Application_Model_Models_Deeplink::TYPE_EXTERNAL) ? ('target="_blank" title="' . $deeplink->getUrl() . '" ') : '') . 'href="' . (($deeplink->getType() == Application_Model_Models_Deeplink::TYPE_INTERNAL) ? $websiteHelper->getUrl() . $deeplink->getUrl() : $deeplink->getUrl()) . '">' . $matches[2] . '</a>';
 			$c = preg_replace('~' . $matches[2] . '~uU', $url, $content, 1);
@@ -171,4 +188,14 @@ class Tools_Content_Tools {
 		}
 		return $string;
 	}
+
+    /**
+     * Cut out edit links from contents.
+     */
+    public static function stripEditLinks($string) {
+        if (Tools_Security_Acl::isAllowed(Tools_Security_Acl::RESOURCE_CONTENT)) {
+            return preg_replace('/<a.*class=\"tpopup generator-links\".*>.*<\/a>/', '', $string);
+        }
+        return $string;
+    }
 }

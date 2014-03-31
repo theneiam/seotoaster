@@ -6,7 +6,7 @@
  */
 class Backend_PageController extends Zend_Controller_Action {
 
-    public static $_allowedActions = array('publishpages');
+    public static $_allowedActions = array('publishpages', 'listpages');
 
     protected $_mapper             = null;
 
@@ -16,15 +16,22 @@ class Backend_PageController extends Zend_Controller_Action {
         }
         $this->view->websiteUrl = $this->_helper->website->getUrl();
 
-        $this->_helper->AjaxContext()->addActionContexts(array(
+        if ('' == $this->getRequest()->getParam('format', '')) {
+            $this->getRequest()->setParam('format', 'json');
+        }
+
+        /* @var Zend_Controller_Action_Helper_ContextSwitch $contextSwitch */
+        $this->_helper->contextSwitch
+            ->addContext('html', array('suffix' => 'html', 'headers' => array('Content-Type' => 'text/html')))
+            ->addActionContexts(array(
             'edit404page'      => 'json',
             'rendermenu'       => 'json',
-            'listpages'        => 'json',
+            'listpages'        => array('json', 'html'),
             'publishpages'     => 'json',
             'checkforsubpages' => 'json',
             'toggleoptimized'  => 'json'
-        ))->initContext('json');
-
+            ))
+            ->initContext();
     }
 
     public function pageAction() {
@@ -62,7 +69,7 @@ class Backend_PageController extends Zend_Controller_Action {
             $messages  = ($params['pageCategory'] == -4) ? array('pageCategory' => array('Please make your selection')) : array();
             $optimized = (isset($params['optimized']) && $params['optimized']);
 
-            //if page is optiized by samba unset optimized values from update
+            //if page is optimized by samba unset optimized values from update
             if($optimized) {
                 $params = $this->_restoreOriginalValues($params);
             }
@@ -115,7 +122,8 @@ class Backend_PageController extends Zend_Controller_Action {
                 if (isset($params['pagePreviewImage']) && !empty ($params['pagePreviewImage'])) {
                     $previewImageName = Tools_Page_Tools::processPagePreviewImage((!$optimized) ? $page->getUrl() : $this->_helper->session->oldPageUrl, $params['pagePreviewImage']);
                 } // else updating existing
-                elseif ($this->_helper->session->oldPageUrl != $page->getUrl()) {
+                elseif (!$optimized && $this->_helper->session->oldPageUrl !== $page->getUrl()) {
+                    // TODO: Refactor this part
 	                $previewImageName = Tools_Page_Tools::processPagePreviewImage((!$optimized) ? $page->getUrl() : $this->_helper->session->oldPageUrl, Tools_Page_Tools::processPagePreviewImage($this->_helper->session->oldPageUrl));
                 }
 
@@ -135,14 +143,14 @@ class Backend_PageController extends Zend_Controller_Action {
                 exit;
             }
             $messages = array_merge($pageForm->getMessages(), $messages);
-            $this->_helper->response->fail(Tools_Content_Tools::proccessFormMessagesIntoHtml($messages, get_class($pageForm)));
+            $this->_helper->response->fail(Tools_Content_Tools::proccessFormMessages($messages));
             exit;
         }
 
         $this->view->faCount = ($page->getId()) ? sizeof(Application_Model_Mappers_FeaturedareaMapper::getInstance()->findAreasByPageId($page->getId())) : 0;
 
         //page preview image
-        $this->view->pagePreviewImage = Tools_Page_Tools::processPagePreviewImage($page->getUrl());
+        $this->view->pagePreviewImage = Tools_Page_Tools::getPreview($page);//Tools_Page_Tools::processPagePreviewImage($page->getUrl());
         $this->view->sambaOptimized   = $page->getOptimized();
 
         // page help section
@@ -277,6 +285,10 @@ class Backend_PageController extends Zend_Controller_Action {
         $categories = $pageMapper->findByParentId(0);
         if(is_array($categories) && !empty ($categories)) {
             foreach ($categories as $category) {
+	            // TODO: remove next check and code something smart
+	            if ($category->getDraft()){
+		            continue;
+	            }
                 $tree[] = array(
                     'category' => $category,
                     'pages'    => $pageMapper->findByParentId($category->getId())
@@ -296,6 +308,23 @@ class Backend_PageController extends Zend_Controller_Action {
             $this->view->templateName = $templateName;
             $where                    = 'template_id="' . $templateName . '"';
         }
+        if($this->getRequest()->getParam('categoryName', false)) {
+            $page = Application_Model_Mappers_PageMapper::getInstance()->findByNavName($this->getRequest()->getParam('categoryName'));
+            $pageId = $page->getId();
+        }
+        elseif($this->getRequest()->getParam('pageId', false)) {
+            $pageId = $this->getRequest()->getParam('pageId');
+        }
+
+        if(isset($pageId) && $pageId) {
+            if($where == null) {
+                $where .= ' parent_id ="' . $pageId . '"';
+            }
+            else {
+                $where .= ' AND parent_id ="' . $pageId . '"';
+            }
+        }
+
         $pages    = Application_Model_Mappers_PageMapper::getInstance()->fetchAll($where, array('h1 ASC'));
         $sysPages = Application_Model_Mappers_PageMapper::getInstance()->fetchAll($where, array('h1 ASC'), true);
         $pages    = array_merge((array)$pages, (array)$sysPages);
@@ -305,23 +334,27 @@ class Backend_PageController extends Zend_Controller_Action {
     }
 
     public function linkslistAction() {
-        //external_link_list_url
-
         $this->_helper->viewRenderer->setNoRender(true);
         $this->_helper->layout->disableLayout();
 
-
-        $externalLinksContent = 'var tinyMCELinkList = new Array(';
-        $pages = Application_Model_Mappers_PageMapper::getInstance()->fetchAll($this->_getProductCategoryPageWhere(), array('h1'));
+        $where = $this->_getProductCategoryPageWhere();
+        $whereQuote = $this->_getQuotePageWhere();
+        if($where !== null && $whereQuote !== null) {
+            $where .= ' AND ' . $whereQuote;
+        }
+        else {
+            $where .= $whereQuote;
+        }
+        $pages = Application_Model_Mappers_PageMapper::getInstance()->fetchAll($where, array('h1'));
         if(!empty ($pages)) {
+            $links = array();
             foreach ($pages as $page) {
-                $externalLinksContent .= '["'
-                    . $page->getH1()
-                    . '", "'
-                    . $this->_helper->website->getUrl() . $page->getUrl()
-                    . '"],';
+                if ($page->getExtraOption(Application_Model_Models_Page::OPT_404PAGE)) {
+                    continue;
+                }
+                array_push($links, array($page->getH1(), $this->_helper->website->getUrl() . $page->getUrl()));
             }
-            $externalLinksContent = substr($externalLinksContent, 0, -1) . ');';
+            $externalLinksContent = sprintf('var tinyMCELinkList = %s;', json_encode($links));
             $this->getResponse()->setRawHeader('Content-type: text/javascript')
                 ->setRawHeader('pragma: no-cache')
                 ->setRawHeader('expires: 0')
@@ -342,7 +375,7 @@ class Backend_PageController extends Zend_Controller_Action {
             }
         }
         if($cleanDraftCache) {
-            $this->_cache->clean(Helpers_Action_Cache::KEY_DRAFT, Helpers_Action_Cache::PREFIX_DRAFT);
+            $this->_cache->clean(false, false, Helpers_Action_Cache::TAG_DRAFT);
         }
     }
 
@@ -361,7 +394,7 @@ class Backend_PageController extends Zend_Controller_Action {
             'h1'              => $page->getH1(),
             'headerTitle'     => $page->getHeaderTitle(),
             'navName'         => $page->getNavName(),
-            'url'             => $page->getUrl(),
+            'url'             => $this->_helper->page->clean($page->getUrl()),
             'metaDescription' => $page->getMetaDescription(),
             'metaKeywords'    => $page->getMetaKeywords(),
             'teaserText'      => $page->getTeaserText()
@@ -378,12 +411,20 @@ class Backend_PageController extends Zend_Controller_Action {
         return (($productCategoryPage instanceof Application_Model_Models_Page) ? 'parent_id != "' . $productCategoryPage->getId() . '"' : null);
     }
 
+    private function _getQuotePageWhere() {
+        $quotePlugin = Application_Model_Mappers_PluginMapper::getInstance()->findByName('quote');
+        if($quotePlugin !== null && $quotePlugin->getStatus() === Application_Model_Models_Plugin::ENABLED) {
+            return 'parent_id != "' . Quote::QUOTE_CATEGORY_ID . '"';
+        }
+        return null;
+    }
+
     private function _restoreOriginalValues($pageData) {
         $page = Application_Model_Mappers_PageMapper::getInstance()->find($pageData['pageId'], true);
         $pageData['h1']              = $page->getH1();
         $pageData['headerTitle']     = $page->getHeaderTitle();
         $pageData['navName']         = $page->getNavName();
-        $pageData['url']             = $page->getUrl();
+        $pageData['url']             = $this->_helper->page->clean($page->getUrl());  // TODO: review this part
         $pageData['metaKeywords']    = $page->getMetaKeywords();
         $pageData['metaDescription'] = $page->getMetaDescription();
         unset($page);

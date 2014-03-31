@@ -304,7 +304,9 @@ class Backend_SeoController extends Zend_Controller_Action {
 			$pageMapper       = Application_Model_Mappers_PageMapper::getInstance();
 			$cid              = intval($this->getRequest()->getParam('cid'));
 			$categoryPage     = ($cid != Application_Model_Models_Page::IDCATEGORY_DEFAULT) ? $pageMapper->find($cid) : $cid;
-			$siloRelatedPages = $pageMapper->findByParentId(($categoryPage instanceof Application_Model_Models_Page) ? $categoryPage->getId() : $categoryPage);
+            $siloRelatedPages = $pageMapper->findByParentId(
+                    ($categoryPage instanceof Application_Model_Models_Page) ? $categoryPage->getId() : $categoryPage
+            );
 			if($categoryPage === null) {
 				throw new Exceptions_SeotoasterException($this->_translator->translate('Cannot load category page'));
 			}
@@ -314,12 +316,19 @@ class Backend_SeoController extends Zend_Controller_Action {
 					$silo             = $siloMapper->findByName(($categoryPage instanceof Application_Model_Models_Page) ? $categoryPage->getNavName() : $this->_helper->language->translate('Without category'));
 					$silo             = ($silo instanceof Application_Model_Models_Silo) ? $silo : new Application_Model_Models_Silo();
 					if($categoryPage instanceof Application_Model_Models_Page) {
+                        $relatedPages = array($categoryPage);
+                        if (is_array($siloRelatedPages) && !empty($siloRelatedPages)) {
+                            $relatedPages = array_merge($siloRelatedPages, $relatedPages);
+                        }
 						$silo->setName($categoryPage->getNavName())
-							->setRelatedPages(array_merge($siloRelatedPages, array($categoryPage)));
+							->setRelatedPages($relatedPages);
+                        unset($relatedPages);
 					}
 					else {
-						$silo->setName($this->_helper->language->translate('Without category'))
-							->setRelatedPages($siloRelatedPages);
+						$silo->setName($this->_helper->language->translate('Without category'));
+                        if (!empty($siloRelatedPages)) {
+                            $silo->setRelatedPages($siloRelatedPages);
+                        }
 					}
 					$siloId = $siloMapper->save($silo);
 					if($siloId) {
@@ -389,14 +398,23 @@ class Backend_SeoController extends Zend_Controller_Action {
         if(($sitemapType = $this->getRequest()->getParam('type', '')) == Tools_Content_Feed::SMFEED_TYPE_REGULAR) {
             //regular sitemap.xml requested
             if(null === ($this->view->pages = $this->_helper->cache->load('sitemappages', 'sitemaps_'))) {
+                if (in_array('newslog', Tools_Plugins_Tools::getEnabledPlugins(true))) {
+                    $this->view->newsPageUrlPath = Newslog_Models_Mapper_ConfigurationMapper::getInstance()->fetchConfigParam('folder');
+                }
                 $pages = Application_Model_Mappers_PageMapper::getInstance()->fetchAll();
                 if(is_array($pages) && !empty($pages)) {
-                    foreach($pages as $key => $page) {
-                        if(!$page->getExtraOption(Application_Model_Models_Page::OPT_PROTECTED)) {
-                            continue;
+
+                    $quoteInstalled = Tools_Plugins_Tools::findPluginByName('quote')->getStatus() == Application_Model_Models_Plugin::ENABLED;
+                    $pages = array_filter($pages, function($page) use($quoteInstalled) {
+                        if($page->getExtraOption(Application_Model_Models_Page::OPT_PROTECTED) ||
+                                                 $page->getDraft() ||
+                                                 $page->getIs404page() ||
+                                                 ($quoteInstalled && (intval($page->getParentId()) === Quote::QUOTE_CATEGORY_ID))) {
+                            return false;
                         }
-                        unset($pages[$key]);
-                    }
+                        return true;
+                    });
+
                 } else {
                     $pages = array();
                 }

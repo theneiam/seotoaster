@@ -37,6 +37,7 @@ class Tools_Content_Parser {
 	public function parse() {
 		$this->_parse();
 		$this->_changeMedia();
+        $this->_iteration = 0;
 		$this->_runMagicSpaces();
 		return $this->_content;
 	}
@@ -103,7 +104,7 @@ class Tools_Content_Parser {
 	}
 
 	private function _changeMedia() {
-		$webPathToTheme = $this->_options['websiteUrl'] . $this->_options['themePath'] . $this->_options['currentTheme'];
+		$webPathToTheme = $this->_options['websiteUrl'] . $this->_options['themePath'] . rawurlencode($this->_options['currentTheme']);
 		$this->_content = preg_replace('~["\']+/*(mobile/)?images/(.*)["\']~Usui', $webPathToTheme . '/$1images/$2', $this->_content);
 		$this->_content = preg_replace('~(<link.*?href=")(\/{0,1}[A-Za-z0-9.\/_\-]+\.css[a-z0-9=\?]*)(".*?>)~Uu','$1' . $webPathToTheme . '/$2' . '$3' , $this->_content);
 		$this->_content = preg_replace('~(<script.*?src=")(\/{0,1}[A-Za-z0-9-\/_.\-]+\.js)(".*?>)~ui', '$1' . $webPathToTheme . '/$2' . '$3' , $this->_content);
@@ -133,25 +134,36 @@ class Tools_Content_Parser {
 	}
 
 	private function _runMagicSpaces() {
-		preg_match_all('~{([\w]+' . self::OPTIONS_SEPARATOR . '*[:\w]*)}~uiUs', $this->_content, $spacesFound);
-		if(!empty($spacesFound) && isset($spacesFound[1])) {
-			foreach($spacesFound[1] as $spaceName) {
+        $this->_iteration++;
 
+		preg_match_all('~{([\w]+' . self::OPTIONS_SEPARATOR . '*[:\w\-\s,&]*)}~uiUs', $this->_content, $spacesFound);
+        $spacesFound = array_filter($spacesFound);
+
+		if (!empty($spacesFound) && isset($spacesFound[1])) {
+			foreach ($spacesFound[1] as $spaceName) {
                 //if any parameters passed
                 $parameters = explode(self::OPTIONS_SEPARATOR, $spaceName);
-                if(is_array($parameters)) {
+                if (is_array($parameters)) {
                     $spaceName = array_shift($parameters);
                 }
 
 				try {
-					$magicSpace     = Tools_Factory_MagicSpaceFactory::createMagicSpace($spaceName, $this->_content, array_merge($this->_pageData, $this->_options), $parameters);
-					$this->_content = $magicSpace->run();
+                    $this->_content = Tools_Factory_MagicSpaceFactory::createMagicSpace(
+                        $spaceName,
+                        $this->_content,
+                        array_merge($this->_pageData, $this->_options),
+                        $parameters
+                    )->run();
 				}
 				catch (Exception $e) {
 					Tools_System_Tools::debugMode() && error_log($e->getMessage());
 					continue;
 				}
 			}
+
+            if ($this->_iteration <= self::PARSE_DEEP) {
+                $this->_runMagicSpaces();
+            }
 		}
 	}
 

@@ -6,7 +6,6 @@ $(function() {
             ui.panel.addClass('plugins-list h425');
             ui.ajaxSettings.dataFilter = function(data) {
                 ui.panel.html($.parseJSON(data).pluginsList);
-                $('.plugin-item a.plugin-control, .plugin-item a.plugin-endis').button();
             };
             ui.jqXHR.done(function(){});
         }
@@ -22,12 +21,12 @@ $(function() {
             }, function(response) {
                 if(!response.error) {
                     var readmeText = (typeof response.responseText == 'undefined' || response.responseText == 'success') ? 'No readme for this plugin provided' : response.responseText;
-                    var readmeDialog = $('<div style="overflow-y:auto; font-size: 14px; padding: 10px; background: #fff;" id="' + pluginName + '-readme">' + readmeText + '</div>');
+                    var readmeDialog = $('<div class="readme-content content-footer" id="' + pluginName + '-readme">' + readmeText + '</div>');
                     readmeDialog.dialog({
                         modal: true,
                         title: pluginName,
                         width: 800,
-                        height: 500,
+                        height: 560,
                         resizable: false,
                         draggable : false,
                         show: 'clip',
@@ -35,8 +34,6 @@ $(function() {
                         buttons: [
                             {text: "Okay", click: function() {$(this).dialog("close")}}
                         ]
-                    }).parent().css({
-                        background: '#DAE8ED'
                     });
                 } else {
                     showMessage(response.responseText, true);
@@ -48,7 +45,6 @@ $(function() {
 function pluginCallback() {
 	$.getJSON($('#website_url').val() + 'backend/backend_plugin/list/', function(response) {
 		$('.plugins-list').html(response.pluginsList);
-		$('a.plugin-control, a.plugin-endis').button();
 	})
 }
 

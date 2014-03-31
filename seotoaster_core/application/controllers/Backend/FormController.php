@@ -132,11 +132,22 @@ class Backend_FormController extends Zend_Controller_Action {
                 // get the form details
 				$form   = $formMapper->findByName($formParams['formName']);
                 $useCaptcha = $form->getCaptcha();
-                
+
+                //hidden input validation
+                $formName = $form->getName();
+                $formId   = $form->getId();
+                if(!isset($formParams[md5($formName.$formId)]) || $formParams[md5($formName.$formId)] != ''){
+                    if($xmlHttpRequest){
+                        $this->_helper->response->success($form->getMessageSuccess());
+                    }
+                    $this->_redirect($formParams['formUrl']);
+                }
+                unset($formParams[md5($formName.$formId)]);
+
                 //validating recaptcha
                 if($useCaptcha == 1){
-                    if(!empty($websiteConfig) && isset($websiteConfig['recapthaPublicKey']) && $websiteConfig['recapthaPublicKey'] != '' 
-                            && isset($websiteConfig['recapthaPrivateKey']) && $websiteConfig['recapthaPrivateKey'] != '' 
+                    if(!empty($websiteConfig) && !empty($websiteConfig[Tools_System_Tools::RECAPTCHA_PUBLIC_KEY])
+                            && !empty($websiteConfig[Tools_System_Tools::RECAPTCHA_PRIVATE_KEY])
                             && isset($formParams['recaptcha_challenge_field']) || isset($formParams['captcha'])){
                         
                         if(isset($formParams['recaptcha_challenge_field']) && isset($formParams['recaptcha_response_field'])) {
@@ -147,7 +158,7 @@ class Backend_FormController extends Zend_Controller_Action {
                                 $sessionHelper->toasterFormError = $this->_helper->language->translate('You\'ve entered an incorrect security text. Please try again.');
                                 $this->_redirect($formParams['formUrl']);
                             }
-                            $recaptcha = new Zend_Service_ReCaptcha($websiteConfig['recapthaPublicKey'], $websiteConfig['recapthaPrivateKey']);
+                            $recaptcha = new Zend_Service_ReCaptcha($websiteConfig[Tools_System_Tools::RECAPTCHA_PUBLIC_KEY], $websiteConfig[Tools_System_Tools::RECAPTCHA_PRIVATE_KEY]);
                             $result = $recaptcha->verify($formParams['recaptcha_challenge_field'], $formParams['recaptcha_response_field']);
                             if(!$result->isValid()){
                                 if($xmlHttpRequest){
@@ -194,7 +205,7 @@ class Backend_FormController extends Zend_Controller_Action {
                     $uploader->setDestination($websitePathTemp);
                     $uploader->addValidator('Extension', false, self::ATTACHMENTS_FILE_TYPES);
                     //Adding Size limitation
-                    $uploader->addValidator('Size', false, 10485760); //limit to 10MB
+                    $uploader->addValidator('Size', false, $formParams['uploadLimitSize']*1024*1024);
                     //Adding mime types validation
                     $uploader->addValidator('MimeType', true, array('application/pdf','application/xml', 'application/zip', 'text/csv', 'text/plain', 'image/png','image/jpeg',
                                                                     'image/gif', 'image/bmp', 'application/msword', 'application/vnd.ms-excel'));
@@ -219,7 +230,7 @@ class Backend_FormController extends Zend_Controller_Action {
                                         $errorMessage .= 'Invalid file format type. ';
                                     }
                                     if($errorType == 'fileSizeTooBig'){
-                                        $errorMessage .= 'Maximum size upload 10mb. ';
+                                        $errorMessage .= $this->_helper->language->translate('Maximum size upload').' '.$formParams['uploadLimitSize'].'mb.';
                                     }
                                     if($errorType == 'fileExtensionFalse'){
                                         $errorMessage .= 'File extension not valid. ';
@@ -232,7 +243,7 @@ class Backend_FormController extends Zend_Controller_Action {
                     }
 
                 }
-
+                unset($formParams['uploadLimitSize']);
                	// sending mails
                 $sysMailWatchdog = new Tools_Mail_SystemMailWatchdog(array(
                     'trigger'    => Tools_Mail_SystemMailWatchdog::TRIGGER_FORMSENT,

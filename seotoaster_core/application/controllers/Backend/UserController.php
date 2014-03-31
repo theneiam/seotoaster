@@ -22,6 +22,7 @@ class Backend_UserController extends Zend_Controller_Action {
 
 	public function manageAction() {
 		$userForm = new Application_Form_User();
+        $userForm->getElement('password')->setRequired(false);
 		if($this->getRequest()->isPost()) {
             //if we are updating
             $userId = $this->getRequest()->getParam('id');
@@ -36,7 +37,7 @@ class Backend_UserController extends Zend_Controller_Action {
 				exit;
 			}
 			else {
-				$this->_helper->response->fail(Tools_Content_Tools::proccessFormMessagesIntoHtml($userForm->getMessages()));
+                $this->_helper->response->fail(Tools_Content_Tools::proccessFormMessages($userForm->getMessages()));
 				exit;
 			}
 		}
@@ -90,6 +91,7 @@ class Backend_UserController extends Zend_Controller_Action {
                     $usrData = $user->toArray();
                     unset($usrData['password']);
                     unset($usrData['id']);
+                    unset($usrData['attributes']);
                     $dataToExport[] = $usrData;
                 }
                 $exportResult = Tools_System_Tools::arrayToCsv($dataToExport, array(

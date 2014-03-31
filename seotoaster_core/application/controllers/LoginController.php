@@ -51,20 +51,35 @@ class LoginController extends Zend_Controller_Action {
 					$this->_memberRedirect(false);
 				}
 
-				$this->_checkRedirect(false, 'There is no user with such login and password.');
+				$this->_checkRedirect(false, array('email' => 'There is no user with such login and password.'));
 			}
 			else {
-				$this->_checkRedirect(false, 'Login should be a valid email address');
+				$this->_checkRedirect(false, array('email' => 'Login should be a valid email address'));
 			}
 		}
 		else {
 			//getting available system translations
             $this->view->languages = $this->_helper->language->getLanguages();
 			//getting messages
+            $errorMessages = $this->_helper->flashMessenger->getMessages();
+            if (!empty($errorMessages)) {
+                foreach ($errorMessages as $message) {
+                    foreach ($message as $elementName => $msg) {
+                        $loginForm->getElement($elementName)->setAttribs(array('class' => 'notvalid', 'title' => $msg));
+                    }
+                }
+            }
 			$this->view->messages   = $this->_helper->flashMessenger->getMessages();
 			//unset url redirect set from any login widget
 			unset($this->_helper->session->redirectUserTo);
-			$this->view->loginForm  = $loginForm;
+            $loginForm->removeDecorator('HtmlTag');
+            $loginForm->setElementDecorators(array(
+                    'ViewHelper',
+                    'Errors',
+                    'Label',
+                    array('HtmlTag', array('tag' => 'p'))
+            ));
+            $this->view->loginForm  = $loginForm;
 		}
 	}
 
@@ -117,8 +132,13 @@ class LoginController extends Zend_Controller_Action {
 				)));
 				$resetTokenId = Application_Model_Mappers_PasswordRecoveryMapper::getInstance()->save($resetToken);
 				if($resetTokenId) {
-					$this->_helper->flashMessenger->addMessage('We\'ve sent an email to ' . $user->getEmail() . ' containing a temporary url that will allow you to reset your password for the next 24 hours. Please check your spam folder if the email doesn\'t appear within a few minutes.');
-					$this->_helper->redirector->gotoRoute(array(
+					$this->_helper->flashMessenger->setNamespace('passreset')->addMessage('We\'ve sent an email to '.$user->getEmail().' containing a temporary url that will allow you to reset your password for the next 24 hours. Please check your spam folder if the email doesn\'t appear within a few minutes.');
+                    if(isset($this->_helper->session->retrieveRedirect)){
+                        $redirectTo = $this->_helper->session->retrieveRedirect;
+                        unset($this->_helper->session->retrieveRedirect);
+                        $this->redirect($this->_helper->website->getUrl() . $redirectTo);
+                    }
+                    $this->_helper->redirector->gotoRoute(array(
 						'controller' => 'login',
 						'action'     => 'passwordretrieve'
 					));
@@ -129,21 +149,44 @@ class LoginController extends Zend_Controller_Action {
 				foreach($messages as $messageData) {
 					if(is_array($messageData)) {
 						array_walk($messageData, function($msg) use($flashMessanger) {
-							$flashMessanger->addMessage($msg);
+							$flashMessanger->addMessage(array('email' => $msg));
 						});
 					} else {
-						$flashMessanger->addMessage($messageData);
+						$flashMessanger->addMessage(array('email' => $messageData));
 					}
 				}
-				return $this->redirect($this->_helper->website->getUrl() . 'login/retrieve/');
+				if(isset($this->_helper->session->retrieveRedirect)){
+                    $redirectTo = $this->_helper->session->retrieveRedirect;
+                    unset($this->_helper->session->retrieveRedirect);
+                    return $this->redirect($this->_helper->website->getUrl() . $redirectTo);
+                }
+                return $this->redirect($this->_helper->website->getUrl() . 'login/retrieve/');
 			}
 		}
-		$this->view->messages = $this->_helper->flashMessenger->getMessages();
+        $errorMessages = $this->_helper->flashMessenger->getMessages();
+        if (!empty($errorMessages)) {
+            foreach ($errorMessages as $message) {
+                foreach ($message as $elementName => $msg) {
+                    $form->getElement($elementName)->setAttribs(array('class' => 'notvalid', 'title' => $msg));
+                }
+            }
+        }
+        $passResetMsg = $this->_helper->flashMessenger->getMessages('passreset');
+        if (!empty($passResetMsg)) {
+            $this->view->retrieveSuccessMessage = join($passResetMsg, PHP_EOL);
+        }
+        $form->removeDecorator('HtmlTag');
+        $form->setElementDecorators(array(
+                'ViewHelper',
+                'Errors',
+                'Label',
+                array('HtmlTag', array('tag' => 'p'))
+        ));
 		$this->view->form     = $form;
 	}
 
 	public function passwordresetAction() {
-		//cehck the get string for the tokens http://mytoaster.com/login/reset/email/myemail@mytoaster.com/token/adadajqwek123klajdlkasdlkq2e3
+		//check the get string for the tokens http://mytoaster.com/login/reset/email/myemail@mytoaster.com/token/adadajqwek123klajdlkasdlkq2e3
 		$error = false;
 		$form  = new Application_Form_PasswordReset();
 		$email = filter_var($this->getRequest()->getParam('email', false), FILTER_SANITIZE_EMAIL);
@@ -177,6 +220,10 @@ class LoginController extends Zend_Controller_Action {
 				$resetToken->setStatus(Application_Model_Models_PasswordRecoveryToken::STATUS_USED);
 				Application_Model_Mappers_PasswordRecoveryMapper::getInstance()->save($resetToken);
 				$this->_helper->flashMessenger->addMessage($this->_helper->language->translate('Your password was reset.'));
+                $roleId = $user->getRoleId();
+                if($roleId != Tools_Security_Acl::ROLE_ADMIN && $roleId != Tools_Security_Acl::ROLE_SUPERADMIN){
+                    return $this->redirect($this->_helper->website->getUrl());
+                }
 				return $this->redirect($this->_helper->website->getUrl() . 'go');
 			} else {
 				$this->_helper->flashMessenger->addMessage($this->_helper->language->translate('Passwords should match'));

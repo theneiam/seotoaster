@@ -1,78 +1,48 @@
-<?php $this->headScript()->appendFile($this->websiteUrl."system/js/external/sisyphus/sisyphus.min.js");?>
-<style>
-	.success, .error {
-		cursor: pointer;
-		display: none;
-		position: absolute;
-		padding: 30px 10% 20px 10%;
-		z-index: 999;
-		text-align: left;
-		width: 80%;
-		margin: 0px auto;
-		font-size: 12pt;
-		color: lavender;
-		font-weight: bold;
-		min-height: 100px;
-		background: lightSeaGreen;
-		opacity: 0.9;
-	}
-
-	.error {
-		background: indianred;
-	}
-</style>
-
 <?php if($this->form): ?>
 	<form name="<?php echo $this->formId; ?>" id="<?php echo $this->formId; ?>" action="<?php echo $this->websiteUrl; ?>backend/backend_form/receiveform/" method='post' enctype="multipart/form-data">
 		<?php echo $this->form->getCode(); ?>
 		<input type="hidden" name="formName" value="<?php echo $this->form->getName(); ?>" />
         <input type="hidden" name="formUrl" value="<?php echo $this->websiteUrl . $this->formUrl; ?>" />
-		<?php if($this->useRecaptcha && $this->recapthaCode && $this->customRecaptcha): ?>
-           <div id="recaptcha_widget">
-               <div id="recaptcha_image"></div>
-               <div class="recaptcha_only_if_incorrect_sol" style="color:red"><?php echo $this->translate('Incorrect please try again');?></div>
-               <label class="recaptcha_only_if_image"><?php echo $this->translate('Enter the words above');?>:</label>
-               <label class="recaptcha_only_if_audio"><?php echo $this->translate('Enter the numbers you hear');?>:</label>
-               <input type="text" id="recaptcha_response_field" name="recaptcha_response_field" />
-               <div class="recaptcha_links">
-                   <a href="javascript:Recaptcha.reload()"><?php echo $this->translate('Get another CAPTCHA');?></a>
-                   <a class="recaptcha_only_if_image" href="javascript:Recaptcha.switch_type('audio')"><?php echo $this->translate('Get an audio CAPTCHA');?></a>
-                   <a class="recaptcha_only_if_audio" href="javascript:Recaptcha.switch_type('image')"><?php echo $this->translate('Get an image CAPTCHA');?></a>
-                   <a class="recaptcha_help" href="javascript:Recaptcha.showhelp()"><?php echo $this->translate('Help');?></a>
-              </div>
-            </div>
-            <?php echo $this->recapthaCode;?>
+        <input style="display: none;" type="text" id="<?php echo md5($this->form->getName().$this->form->getId()); ?>" name="<?php echo md5($this->form->getName().$this->form->getId()); ?>" value="" data-secur="smart"/>
+		<?php if($this->useRecaptcha && $this->recaptchaCode) : ?>
+            <?php
+            if ($this->customRecaptcha) {
+                echo $this->partial(
+                    'recaptcha.phtml',
+                    array('content' => $this->recaptchaCode, 'recaptchaId' => $this->recaptchaWidgetId)
+                );
+            } else {
+                echo $this->recaptchaCode;
+            }
+            ?>
         <?php endif; ?>
-        <?php if($this->useRecaptcha && $this->recapthaCode && !$this->customRecaptcha): ?>
-            <?php echo $this->recapthaCode;?>
-        <?php endif;?>
         <?php if($this->useCaptcha):?>
             <div class="captcha">
                 <img src="<?php echo $this->websiteUrl . $this->websiteTmp . $this->captchaId . '.png';?>" />
-                <label><?php echo $this->translate('Please enter this code in the box below'); ?></label>
-                <input type="text" name="captcha" value="" />
+                <label class="captcha_label"><?php echo $this->translate('Enter the words from picture');?></label>
+                <input class="captcha_field" type="text" name="captcha" value="" />
                 <input type="hidden" class="captcha-id" name="captchaId" value="<?php echo $this->captchaId; ?>" />
            </div>
         <?php endif; ?>
-        
-                <input type="hidden" name="formPageId" value="<?php echo $this->pageId; ?>"/>
-                <?php if($this->trackingConversionUrl):?>
-                    <input type="hidden" name="conversionPageUrl" value="<?php echo $this->websiteUrl.$this->trackingConversionUrl;?>" />
-                <?php endif;?>
-		        <input type="submit" name="submit" value="<?php echo $this->translate('Send');?>" />
-	</form>
+        <input type="hidden" name="formPageId" value="<?php echo $this->pageId; ?>"/>
+        <?php if($this->trackingConversionUrl):?>
+            <input type="hidden" name="conversionPageUrl" value="<?php echo $this->websiteUrl.$this->trackingConversionUrl;?>" />
+        <?php endif;?>
+        <input type="hidden" name="uploadLimitSize" value="<?php echo $this->uploadLimitSize;?>"/>
+        <input type="submit" name="submit" value="<?php echo $this->translate('Send');?>" />
+    </form>
 <?php endif; ?>
 <?php if($this->allowMidification): ?>
-<p class="form-controls">
-	<a class="tpopup" href="javascript:;" data-pwidth="454" data-pheight="594" data-url="<?php echo $this->websiteUrl; ?>backend/backend_form/manageform/name/<?php echo $this->formName; ?>/pageId/<?php echo $this->pageId; ?>/" title="<?php echo $this->translate('Edit form'); ?>"><?php echo $this->translate('Edit this form'); ?></a> |
-	<a href="http://www.seosamba.com/free-form-maker/" target="_blank" title="<?php echo $this->translate('Get valid and solid form code'); ?>"><?php echo $this->translate('Get form code'); ?></a> |
-	<?php if($this->form): ?>
-		<a data-url="<?php echo $this->websiteUrl; ?>backend/backend_form/delete/" data-eid="<?php echo $this->form->getId(); ?>" class="_tdelete" href="javascript:;" title="<?php echo $this->translate('Delete this form'); ?>" data-callback="formCallback"><img src="<?php echo $this->websiteUrl; ?>system/images/delete.png" alt="delete"/></a>
-	<?php endif; ?>
-</p>
+    <p class="form-controls">
+        <a class="tpopup" href="javascript:;" data-pwidth="480" data-pheight="560" data-url="<?php echo $this->websiteUrl; ?>backend/backend_form/manageform/name/<?php echo $this->formName; ?>/pageId/<?php echo $this->pageId; ?>/" title="<?php echo $this->translate('Edit form'); ?>"><?php echo $this->translate('Edit this form'); ?></a> |
+        <a href="http://www.seosamba.com/free-form-maker/" target="_blank" title="<?php echo $this->translate('Get valid and solid form code'); ?>"><?php echo $this->translate('Build your form now'); ?></a> |
+        <?php if($this->form): ?>
+            <a data-url="<?php echo $this->websiteUrl; ?>backend/backend_form/delete/" data-eid="<?php echo $this->form->getId(); ?>" class="_tdelete" href="javascript:;" title="<?php echo $this->translate('Delete this form'); ?>" data-callback="formCallback"><img src="<?php echo $this->websiteUrl; ?>system/images/delete.png" alt="delete"/></a>
+        <?php endif; ?>
+    </p>
 <?php endif; ?>
 
-
+<?php $this->headScript()->appendFile($this->websiteUrl."system/js/external/sisyphus/sisyphus.min.js");?>
 <script type="text/javascript">
     $(function() {
         var form = $('#<?php echo $this->formId; ?>');
@@ -95,7 +65,7 @@
                     url      : form.attr('action'),
                     type     : 'post',
                     data     : form.serialize(),
-                    beforeSend: showSpinner,
+                    beforeSend: showSpinner(),
                     dataType :'json',
                     success  : function(response) {
                         hideSpinner();

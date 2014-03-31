@@ -33,6 +33,7 @@ class Tools_Plugins_Tools {
 			try {
 				$configIni = new Zend_Config_Ini($pluginConfigPath);
 				$items     = array();
+                $values    = array();
 
 				if(!isset($configIni->cpanel)) {
 					continue;
@@ -48,18 +49,30 @@ class Tools_Plugins_Tools {
                 if (!isset($additionalMenu[$title])){
 					$additionalMenu[$title] = array(
 						'title' => $title,
-						'items' => array()
+						'items' => array(),
+                        'values' => array()
 					);
 				}
 
 				if(isset($configIni->cpanel->items)) {
 					$items = array_values($configIni->cpanel->items->toArray());
 				}
+                if(isset($configIni->cpanel->values)) {
+                    $values = array_values($configIni->cpanel->values->toArray());
+                }
 				if(isset($configIni->$userRole) && isset($configIni->$userRole->items)) {
 					$items = array_merge($items, array_values($configIni->$userRole->items->toArray()));
 				}
+                if(isset($configIni->$userRole) && isset($configIni->$userRole->values)) {
+                    $values = array_merge($values, array_values($configIni->$userRole->values->toArray()));
+                }
 
 				$websiteUrl = Zend_Controller_Action_HelperBroker::getStaticHelper('website')->getUrl();
+                foreach ($values as $value) {
+                    array_push($additionalMenu[$title]['values'], $value);
+                    unset($value);
+                }
+
 				foreach ($items as $item) {
 					if (is_string($item)){
 						$item = strtr($item, array(
@@ -135,7 +148,7 @@ class Tools_Plugins_Tools {
                 if(APPLICATION_ENV == 'development') {
                     Zend_Debug::dump($zce->getMessage() . '<br />' . $zce->getTraceAsString());
                 }
-                error_log("(plugin: " . strtolower(get_called_class()) . ") " . $se->getMessage() . "\n" . $se->getTraceAsString());
+                error_log("(plugin: " . strtolower(get_called_class()) . ") " . $zce->getMessage() . "\n" . $zce->getTraceAsString());
             }
             if(!isset($configIni->actiontriggers)) {
                 continue;
@@ -513,7 +526,7 @@ class Tools_Plugins_Tools {
     }
 
 	public static function registerPluginsIncludePath($force = false){
-		$cacheHelper   = Zend_Controller_Action_HelperBroker::getStaticHelper('cache');
+		$cacheHelper   = Zend_Controller_Action_HelperBroker::getStaticHelper('cache')->init();
 
 		if ($force) {
 			$cacheHelper->clean(null, null, array('plugins'));

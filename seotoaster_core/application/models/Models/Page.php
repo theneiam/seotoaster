@@ -72,6 +72,23 @@ class Application_Model_Models_Page extends Application_Model_Models_Abstract im
 
 	protected $_previewImage      = null;
 
+    protected $_containers        = array();
+
+    /**
+     * @param array $containers
+     */
+    public function setContainers($containers) {
+        $this->_containers = $containers;
+    }
+
+    /**
+     * @return array
+     */
+    public function getContainers() {
+        return $this->_containers;
+    }
+
+
 	public function getContent() {
 		return $this->_content;
 	}
@@ -299,7 +316,7 @@ class Application_Model_Models_Page extends Application_Model_Models_Abstract im
 	}
 
 	public function setOptimized($optimized) {
-		$this->_optimized = $optimized;
+		$this->_optimized = (boolean)$optimized;
 		return $this;
 	}
 
@@ -372,4 +389,3 @@ class Application_Model_Models_Page extends Application_Model_Models_Abstract im
 	}
 
 }
-

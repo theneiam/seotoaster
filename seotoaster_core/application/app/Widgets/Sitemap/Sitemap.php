@@ -23,14 +23,15 @@ class Widgets_Sitemap_Sitemap extends Widgets_Abstract {
         $showMemberPages = (boolean) $configHelper->getConfig('memPagesInMenu');
         $isAllowed       = Tools_Security_Acl::isAllowed(Tools_Security_Acl::RESOURCE_PAGE_PROTECTED);
         $flatPages       = Application_Model_Mappers_PageMapper::getInstance()->fetchAllStaticMenuPages();
+        $nomenuPages     = Application_Model_Mappers_PageMapper::getInstance()->fetchAllNoMenuPages();
         foreach($pages as $key => $page) {
             if($page['parentId'] == 0) {
-                if($page['protected'] && !$isAllowed && !$showMemberPages) {
+                if((bool)$page['protected'] && !$isAllowed && !$showMemberPages) {
                     continue;
                 }
                 $pagesList[$key]['category'] = $page;
                 foreach($pages as $subPage) {
-                    if($subPage['protected'] && !$isAllowed && !$showMemberPages) {
+                    if ((isset($subPage['protected']) && (bool)$subPage['protected']) && !$isAllowed && !$showMemberPages) {
                         continue;
                     }
                     if($subPage['parentId'] == $page['id']) {
@@ -39,9 +40,19 @@ class Widgets_Sitemap_Sitemap extends Widgets_Abstract {
                 }
             }
         }
-        $this->_view->pages      = $pagesList;
-        $this->_view->flatPages  = $flatPages;
-		$this->_view->newsFolder = $configHelper->getConfig('newsFolder');
+        $this->_view->pages        = $pagesList;
+        $this->_view->flatPages    = $flatPages;
+        if(isset($this->_options[0])) {
+            if($this->_options[0] == 'nomenuPages') {
+        $this->_view->nomenuPages  = $nomenuPages;
+            }
+        }
+        $newslogPlugin = Application_Model_Mappers_PluginMapper::getInstance()->findByName('newslog');
+        if($newslogPlugin instanceof Application_Model_Models_Plugin){
+            if($newslogPlugin->getStatus() == Application_Model_Models_Plugin::ENABLED){
+                $this->_view->newsFolder = Newslog_Models_Mapper_ConfigurationMapper::getInstance()->fetchConfigParam('folder');
+            }
+        }
 		return $this->_view->render('sitemap.phtml');
 	}
 
