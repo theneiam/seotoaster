@@ -13,10 +13,5 @@
     "require": {
         "php": ">= 5.3.7"
     },
-    "minimum-stability": "dev",
-    "extra": {
-        "branch-alias": {
-            "dev-master": "dev-develop"
-        }
-    }
+    "minimum-stability": "dev"
 }
