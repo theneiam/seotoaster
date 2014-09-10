@@ -13,7 +13,7 @@
     // adding canonical link
     if ($this->tplType !== 'typemail') {
         $this->headLink()->setIndent(8)
-            ->prependStylesheet($this->websiteUrl.'system/js/external/fancybox/jquery.fancybox.css')
+            ->prependStylesheet($this->websiteUrl.'system/js/external/magnific-popup/magnific-popup.css')
             ->prependStylesheet($this->websiteUrl.'system/css/seotoaster-ui.css')
             ->prependStylesheet($this->websiteUrl.'system/css/reset.css');
     }
@@ -38,7 +38,7 @@
 
     $this->jQuery()
         ->uiEnable()
-        ->addJavascriptFile($this->websiteUrl.'system/js/external/fancybox/jquery.fancybox.js')
+        ->addJavascriptFile($this->websiteUrl.'system/js/external/magnific-popup/jquery.magnific-popup.min.js')
         ->addJavascriptFile($this->websiteUrl.'system/js/external/jquery/plugins/mousewheel/jquery.mousewheel.min.js')
         ->addJavascriptFile($this->websiteUrl.'system/js/external/jquery/plugins/cookie/jquery.cookie.js')
         ->addJavascriptFile($this->websiteUrl.'system/js/external/smoke/smoke.min.js');
@@ -46,7 +46,8 @@
     $device = Zend_Controller_Action_HelperBroker::getStaticHelper('mobile');
     if($device->isTablet() || $device->isMobile()){
         $this->jQuery()
-            ->addJavascriptFile($this->websiteUrl.'system/js/external/jquery/plugins/touchpunch/jquery.ui.touch-punch.min.js');
+            ->addJavascriptFile($this->websiteUrl.'system/js/external/jquery/plugins/touchpunch/jquery.ui.touch-punch.min.js')
+            ->addJavascriptFile($this->websiteUrl.'system/js/external/hammer/hammer.min.js');
 
     }
 
@@ -61,6 +62,7 @@
     else {
 	    echo $this->headScript();
 	}
+    echo $this->headStyle();
     // link and script block end
 
     echo $this->placeholder('misc');
